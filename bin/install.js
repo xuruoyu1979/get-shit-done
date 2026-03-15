@@ -733,13 +733,6 @@ function generateCodexAgentToml(agentName, agentContent) {
 function generateCodexConfigBlock(agents) {
   const lines = [
     GSD_CODEX_MARKER,
-    '[features]',
-    'multi_agent = true',
-    'default_mode_request_user_input = true',
-    '',
-    '[agents]',
-    'max_threads = 4',
-    'max_depth = 2',
     '',
   ];
 
@@ -816,45 +809,16 @@ function mergeCodexConfig(configPath, gsdBlock) {
       before = before.replace(/^\[agents\]\n(?:(?!\[)[^\n]*\n?)*/m, '');
       before = before.replace(/\n{3,}/g, '\n\n').trimEnd();
 
-      // Re-inject feature keys if user has [features] above the marker
-      const hasFeatures = /^\[features\]\s*$/m.test(before);
-      if (hasFeatures) {
-        if (!before.includes('multi_agent')) {
-          before = before.replace(/^\[features\]\s*$/m, '[features]\nmulti_agent = true');
-        }
-        if (!before.includes('default_mode_request_user_input')) {
-          before = before.replace(/^\[features\].*$/m, '$&\ndefault_mode_request_user_input = true');
-        }
-      }
-      // Skip [features] from gsdBlock if user already has it
-      const block = hasFeatures
-        ? GSD_CODEX_MARKER + '\n' + gsdBlock.substring(gsdBlock.indexOf('[agents]'))
-        : gsdBlock;
-      fs.writeFileSync(configPath, before + '\n\n' + block + '\n');
+      fs.writeFileSync(configPath, before + '\n\n' + gsdBlock + '\n');
     } else {
       fs.writeFileSync(configPath, gsdBlock + '\n');
     }
     return;
   }
 
-  // Case 3: No marker — inject features if needed, append agents
+  // Case 3: No marker — append GSD block
   let content = existing;
-  const featuresRegex = /^\[features\]\s*$/m;
-  const hasFeatures = featuresRegex.test(content);
-
-  if (hasFeatures) {
-    if (!content.includes('multi_agent')) {
-      content = content.replace(featuresRegex, '[features]\nmulti_agent = true');
-    }
-    if (!content.includes('default_mode_request_user_input')) {
-      content = content.replace(/^\[features\].*$/m, '$&\ndefault_mode_request_user_input = true');
-    }
-    // Append agents block (skip the [features] section from gsdBlock)
-    const agentsBlock = gsdBlock.substring(gsdBlock.indexOf('[agents]'));
-    content = content.trimEnd() + '\n\n' + GSD_CODEX_MARKER + '\n' + agentsBlock + '\n';
-  } else {
-    content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
-  }
+  content = content.trimEnd() + '\n\n' + gsdBlock + '\n';
 
   fs.writeFileSync(configPath, content);
 }
