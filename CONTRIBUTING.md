@@ -1,5 +1,7 @@
 # Contributing to GSD
 
+We're glad you're here. Contributions are welcome across the entire codebase. We hold a high bar for what gets merged — not to be gatekeepers, but because every change ships to real users and stability matters.
+
 ## Getting Started
 
 ```bash
@@ -14,12 +16,141 @@ npm install
 npm test
 ```
 
+## Before You Start
+
+1. **Check existing issues.** Someone may already be working on it.
+2. **Claim the issue.** Comment on the issue to get it assigned to you before writing code. This prevents duplicate work and wasted effort.
+3. **No issue? Create one first** for new features. Bug fixes for obvious problems can skip this step.
+4. **Architectural changes require discussion.** If your change touches core systems (agent definitions, workflow engine, tool infrastructure), open an issue describing your approach and get approval before writing code.
+
+## Branching and Commits
+
+Always work on a dedicated branch. Never push directly to `main`.
+
+**Branch naming:** `<type>/<short-description>`
+
+| Type | When to use |
+|------|-------------|
+| `feat/` | New functionality |
+| `fix/` | Bug or defect correction |
+| `refactor/` | Code restructuring, no behavior change |
+| `test/` | Adding or updating tests |
+| `docs/` | Documentation only |
+| `chore/` | Dependencies, tooling, housekeeping |
+| `ci/` | CI/CD configuration |
+
+**Commit messages** must follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>): <short summary>
+```
+
+Valid types: `feat` `fix` `docs` `chore` `refactor` `test` `ci` `perf` `build` `revert`
+
+Examples:
+
+```
+feat(tools): add milestone status command
+fix(security): resolve path traversal on Windows
+chore(deps): bump node minimum to 22
+docs(contributing): add branch naming conventions
+```
+
+Keep branches current by rebasing onto `main` — do not merge `main` into your feature branch:
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
 ## Pull Request Guidelines
+
+### Requirements
 
 - **One concern per PR** — bug fixes, features, and refactors should be separate PRs
 - **No drive-by formatting** — don't reformat code unrelated to your change
 - **Link issues** — use `Fixes #123` or `Closes #123` in PR body for auto-close
 - **CI must pass** — all matrix jobs (Ubuntu, macOS, Windows × Node 22, 24) must be green
+
+### PR Description Format
+
+Every PR needs a **TL;DR** and a **detailed explanation**. Use this structure:
+
+```
+## TL;DR
+
+**What:** One sentence — what does this change?
+**Why:** One sentence — why is it needed?
+**How:** One sentence — what's the approach?
+
+## What
+
+Detailed description of the change. What files, modules, or systems are affected?
+
+## Why
+
+The motivation. What problem does this solve? What was broken, missing, or suboptimal?
+Link issues where applicable: `Closes #123`
+
+## How
+
+The approach. How does the implementation work? What were the key decisions?
+If this is a non-trivial change, explain the design and any alternatives you considered.
+```
+
+### Change Type Checklist
+
+Include in your PR:
+
+- [ ] `feat` — New feature or capability
+- [ ] `fix` — Bug fix
+- [ ] `refactor` — Code restructuring (no behavior change)
+- [ ] `test` — Adding or updating tests
+- [ ] `docs` — Documentation only
+- [ ] `chore` — Build, CI, or tooling changes
+
+### Breaking Changes
+
+If your PR changes any public API, CLI behavior, config format, or file structure, say so explicitly. Breaking changes need extra scrutiny and may need migration guidance.
+
+## Code Review Process
+
+PRs go through automated CI first, then human review. To help us review efficiently:
+
+- Keep PRs focused and reasonably sized. Massive PRs take longer to review and are more likely to be sent back.
+- Respond to review comments. If you disagree, explain why — discussion is welcome.
+- If your PR has been open for a while without review, ping the maintainers.
+
+### What Reviewers Verify
+
+1. **Build the branch** — a diff that doesn't build is not reviewable.
+2. **Run the test suite** — CI status is a signal, not a substitute for local verification.
+3. **Trace root cause for bug fixes** — confirm the diff addresses the root cause, not just the symptom.
+4. **Check for regression tests** — bug fixes must include a test that would have caught the original bug.
+
+### What Contributors Must Provide
+
+- **Bug fixes** — include a regression test. A fix without a test is an assertion, not a proof.
+- **Features** — include tests covering the primary success path and at least one failure path.
+- **Behavior changes** — update or replace any existing tests that cover the changed behavior. Don't leave passing-but-wrong tests in place.
+
+## AI-Assisted Contributions
+
+AI-generated PRs are welcome. We just ask for transparency:
+
+- **Disclose it.** Note that the PR is AI-assisted in your description. Do not credit the AI tool as an author or co-author in the commit or PR.
+- **Test it.** AI-generated code must be tested to the same standard as human-written code. "The AI said it works" is not a test plan.
+- **Understand it.** You should be able to explain what the code does and why. If a reviewer asks a question, "I'll ask the AI" is not an answer.
+
+AI agents opening PRs must follow the same workflow as human contributors: clean working tree, new branch per task, CI passing before requesting review.
+
+## Architecture Guidelines
+
+Before writing code, understand these principles:
+
+- **Simplicity wins.** Don't add abstractions, helpers, or utilities for one-time operations. Don't design for hypothetical future requirements.
+- **Tests are the contract.** Changed behavior? The test suite tells you what you broke.
+- **No external dependencies in core.** Keep the core dependency-free. If you need something, implement it or justify the addition.
 
 ## Testing Standards
 
@@ -194,3 +325,9 @@ docs/                   — User-facing documentation
 - **Path validation** — use `validatePath()` from `security.cjs` for any user-provided paths
 - **No shell injection** — use `execFileSync` (array args) over `execSync` (string interpolation)
 - **No `${{ }}` in GitHub Actions `run:` blocks** — bind to `env:` mappings first
+
+If you find a security vulnerability, **do not open a public issue.** Use GitHub's private vulnerability reporting instead.
+
+## Questions?
+
+Open a discussion on GitHub or file an issue with the `question` label.
