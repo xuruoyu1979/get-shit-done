@@ -188,6 +188,10 @@ export enum GSDEventType {
   StatusChange = 'status_change',
   CompactBoundary = 'compact_boundary',
   StreamEvent = 'stream_event',
+  PhaseStart = 'phase_start',
+  PhaseStepStart = 'phase_step_start',
+  PhaseStepComplete = 'phase_step_complete',
+  PhaseComplete = 'phase_complete',
 }
 
 /**
@@ -362,6 +366,49 @@ export interface GSDStreamEvent extends GSDEventBase {
 }
 
 /**
+ * Phase execution started.
+ */
+export interface GSDPhaseStartEvent extends GSDEventBase {
+  type: GSDEventType.PhaseStart;
+  phaseNumber: string;
+  phaseName: string;
+}
+
+/**
+ * A single phase step (discuss, research, etc.) started.
+ */
+export interface GSDPhaseStepStartEvent extends GSDEventBase {
+  type: GSDEventType.PhaseStepStart;
+  phaseNumber: string;
+  step: PhaseStepType;
+}
+
+/**
+ * A single phase step completed.
+ */
+export interface GSDPhaseStepCompleteEvent extends GSDEventBase {
+  type: GSDEventType.PhaseStepComplete;
+  phaseNumber: string;
+  step: PhaseStepType;
+  success: boolean;
+  durationMs: number;
+  error?: string;
+}
+
+/**
+ * Full phase execution completed.
+ */
+export interface GSDPhaseCompleteEvent extends GSDEventBase {
+  type: GSDEventType.PhaseComplete;
+  phaseNumber: string;
+  phaseName: string;
+  success: boolean;
+  totalCostUsd: number;
+  totalDurationMs: number;
+  stepsCompleted: number;
+}
+
+/**
  * Discriminated union of all GSD events.
  */
 export type GSDEvent =
@@ -380,7 +427,11 @@ export type GSDEvent =
   | GSDRateLimitEvent
   | GSDStatusChangeEvent
   | GSDCompactBoundaryEvent
-  | GSDStreamEvent;
+  | GSDStreamEvent
+  | GSDPhaseStartEvent
+  | GSDPhaseStepStartEvent
+  | GSDPhaseStepCompleteEvent
+  | GSDPhaseCompleteEvent;
 
 /**
  * Transport handler interface for consuming GSD events.
@@ -426,4 +477,86 @@ export interface CostTracker {
   cumulativeCostUsd: number;
   /** Current active session ID. */
   activeSessionId?: string;
+}
+
+// ─── S03: Phase lifecycle types ──────────────────────────────────────────────
+
+/**
+ * Steps in the phase lifecycle state machine.
+ * Extends beyond the existing PhaseType enum (which covers session types)
+ * to include the full lifecycle including 'advance'.
+ */
+export enum PhaseStepType {
+  Discuss = 'discuss',
+  Research = 'research',
+  Plan = 'plan',
+  Execute = 'execute',
+  Verify = 'verify',
+  Advance = 'advance',
+}
+
+/**
+ * Structured output from `gsd-tools.cjs init phase-op <N>`.
+ * Describes the current state of a phase on disk.
+ */
+export interface PhaseOpInfo {
+  phase_found: boolean;
+  phase_dir: string;
+  phase_number: string;
+  phase_name: string;
+  phase_slug: string;
+  padded_phase: string;
+  has_research: boolean;
+  has_context: boolean;
+  has_plans: boolean;
+  has_verification: boolean;
+  plan_count: number;
+  roadmap_exists: boolean;
+  planning_exists: boolean;
+  commit_docs: boolean;
+  context_path: string;
+  research_path: string;
+}
+
+/**
+ * Result of a single phase step execution.
+ */
+export interface PhaseStepResult {
+  step: PhaseStepType;
+  success: boolean;
+  durationMs: number;
+  error?: string;
+  planResults?: PlanResult[];
+}
+
+/**
+ * Result of a full phase lifecycle run.
+ */
+export interface PhaseRunnerResult {
+  phaseNumber: string;
+  phaseName: string;
+  steps: PhaseStepResult[];
+  success: boolean;
+  totalCostUsd: number;
+  totalDurationMs: number;
+}
+
+/**
+ * Callback hooks for human gates in the phase lifecycle.
+ * When not provided, the runner auto-approves at each gate.
+ */
+export interface HumanGateCallbacks {
+  onDiscussApproval?: (context: { phaseNumber: string; phaseName: string }) => Promise<'approve' | 'reject' | 'modify'>;
+  onVerificationReview?: (result: { phaseNumber: string; stepResult: PhaseStepResult }) => Promise<'accept' | 'reject' | 'retry'>;
+  onBlockerDecision?: (blocker: { phaseNumber: string; step: PhaseStepType; error?: string }) => Promise<'retry' | 'skip' | 'stop'>;
+}
+
+/**
+ * Options for configuring a PhaseRunner execution.
+ */
+export interface PhaseRunnerOptions {
+  callbacks?: HumanGateCallbacks;
+  maxBudgetPerStep?: number;
+  maxTurnsPerStep?: number;
+  model?: string;
 }

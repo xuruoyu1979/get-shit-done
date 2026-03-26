@@ -7,11 +7,12 @@
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKMessage, SDKResultMessage, SDKResultSuccess, SDKResultError } from '@anthropic-ai/claude-agent-sdk';
-import type { ParsedPlan, PlanResult, SessionOptions, SessionUsage, GSDCostUpdateEvent } from './types.js';
-import { GSDEventType } from './types.js';
+import type { ParsedPlan, PlanResult, SessionOptions, SessionUsage, GSDCostUpdateEvent, PhaseStepType } from './types.js';
+import { GSDEventType, PhaseType } from './types.js';
 import type { GSDConfig } from './config.js';
 import { buildExecutorPrompt, parseAgentTools, DEFAULT_ALLOWED_TOOLS } from './prompt-builder.js';
 import type { GSDEventStream, EventStreamContext } from './event-stream.js';
+import { getToolsForPhase } from './tool-scoping.js';
 
 // ─── Model resolution ────────────────────────────────────────────────────────
 
@@ -93,71 +94,7 @@ export async function runPlanSession(
     },
   });
 
-  // Process the message stream
-  let resultMessage: SDKResultMessage | undefined;
-
-  try {
-    for await (const message of queryStream) {
-      // Emit event through the stream if provided
-      if (eventStream) {
-        eventStream.mapAndEmit(message, streamContext ?? {});
-      }
-
-      // We only care about the result message — it contains all metrics
-      if (isResultMessage(message)) {
-        resultMessage = message;
-      }
-    }
-  } catch (err) {
-    // Stream-level error (not a query error — those come as result messages)
-    return {
-      success: false,
-      sessionId: '',
-      totalCostUsd: 0,
-      durationMs: 0,
-      usage: emptyUsage(),
-      numTurns: 0,
-      error: {
-        subtype: 'error_during_execution',
-        messages: [err instanceof Error ? err.message : String(err)],
-      },
-    };
-  }
-
-  // No result message received (shouldn't happen, but handle defensively)
-  if (!resultMessage) {
-    return {
-      success: false,
-      sessionId: '',
-      totalCostUsd: 0,
-      durationMs: 0,
-      usage: emptyUsage(),
-      numTurns: 0,
-      error: {
-        subtype: 'error_during_execution',
-        messages: ['No result message received from query stream'],
-      },
-    };
-  }
-
-  // Extract result
-  const result = extractResult(resultMessage);
-
-  // Emit a cost_update event with session and cumulative totals
-  if (eventStream) {
-    const cost = eventStream.getCost();
-    eventStream.emitEvent({
-      type: GSDEventType.CostUpdate,
-      timestamp: new Date().toISOString(),
-      sessionId: resultMessage.session_id,
-      phase: streamContext?.phase,
-      planName: streamContext?.planName,
-      sessionCostUsd: result.totalCostUsd,
-      cumulativeCostUsd: cost.cumulative,
-    } as GSDCostUpdateEvent);
-  }
-
-  return result;
+  return processQueryStream(queryStream, eventStream, streamContext);
 }
 
 // ─── Result extraction ───────────────────────────────────────────────────────
@@ -219,4 +156,143 @@ function extractResult(msg: SDKResultMessage): PlanResult {
       messages: errorMsg.errors ?? [],
     },
   };
+}
+
+// ─── Shared stream processing ────────────────────────────────────────────────
+
+/**
+ * Process a query() message stream, emit events, and extract the result.
+ * Shared between runPlanSession and runPhaseStepSession to avoid duplication.
+ */
+async function processQueryStream(
+  queryStream: AsyncIterable<SDKMessage>,
+  eventStream?: GSDEventStream,
+  streamContext?: EventStreamContext,
+): Promise<PlanResult> {
+  let resultMessage: SDKResultMessage | undefined;
+
+  try {
+    for await (const message of queryStream) {
+      if (eventStream) {
+        eventStream.mapAndEmit(message, streamContext ?? {});
+      }
+      if (isResultMessage(message)) {
+        resultMessage = message;
+      }
+    }
+  } catch (err) {
+    return {
+      success: false,
+      sessionId: '',
+      totalCostUsd: 0,
+      durationMs: 0,
+      usage: emptyUsage(),
+      numTurns: 0,
+      error: {
+        subtype: 'error_during_execution',
+        messages: [err instanceof Error ? err.message : String(err)],
+      },
+    };
+  }
+
+  if (!resultMessage) {
+    return {
+      success: false,
+      sessionId: '',
+      totalCostUsd: 0,
+      durationMs: 0,
+      usage: emptyUsage(),
+      numTurns: 0,
+      error: {
+        subtype: 'error_during_execution',
+        messages: ['No result message received from query stream'],
+      },
+    };
+  }
+
+  const result = extractResult(resultMessage);
+
+  if (eventStream) {
+    const cost = eventStream.getCost();
+    eventStream.emitEvent({
+      type: GSDEventType.CostUpdate,
+      timestamp: new Date().toISOString(),
+      sessionId: resultMessage.session_id,
+      phase: streamContext?.phase,
+      planName: streamContext?.planName,
+      sessionCostUsd: result.totalCostUsd,
+      cumulativeCostUsd: cost.cumulative,
+    } as GSDCostUpdateEvent);
+  }
+
+  return result;
+}
+
+// ─── Phase step session runner ───────────────────────────────────────────────
+
+/**
+ * Map PhaseStepType to PhaseType for tool scoping.
+ * PhaseStepType includes 'advance' which has no session-level equivalent.
+ */
+function stepTypeToPhaseType(step: PhaseStepType): PhaseType {
+  const mapping: Record<string, PhaseType> = {
+    discuss: PhaseType.Discuss,
+    research: PhaseType.Research,
+    plan: PhaseType.Plan,
+    execute: PhaseType.Execute,
+    verify: PhaseType.Verify,
+  };
+  return mapping[step] ?? PhaseType.Execute;
+}
+
+/**
+ * Run a phase step session via the Agent SDK query() function.
+ *
+ * Unlike runPlanSession which takes a ParsedPlan, this accepts a raw prompt
+ * string and a phase step type. The prompt becomes the system prompt append,
+ * and tools are scoped by phase type.
+ *
+ * @param prompt - Raw prompt string to append to the system prompt
+ * @param phaseStep - Phase step type (determines tool scoping)
+ * @param config - GSD project configuration
+ * @param options - Session overrides (maxTurns, budget, model, etc.)
+ * @param eventStream - Optional event stream for observability
+ * @param streamContext - Optional context for event tagging
+ * @returns Typed PlanResult with cost, duration, success/error status
+ */
+export async function runPhaseStepSession(
+  prompt: string,
+  phaseStep: PhaseStepType,
+  config: GSDConfig,
+  options?: SessionOptions,
+  eventStream?: GSDEventStream,
+  streamContext?: EventStreamContext,
+): Promise<PlanResult> {
+  const phaseType = stepTypeToPhaseType(phaseStep);
+  const allowedTools = options?.allowedTools ?? getToolsForPhase(phaseType);
+  const model = resolveModel(options, config);
+  const maxTurns = options?.maxTurns ?? 50;
+  const maxBudgetUsd = options?.maxBudgetUsd ?? 5.0;
+  const cwd = options?.cwd ?? process.cwd();
+
+  const queryStream = query({
+    prompt: prompt,
+    options: {
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: prompt,
+      },
+      settingSources: ['project'],
+      allowedTools,
+      permissionMode: 'bypassPermissions',
+      allowDangerouslySkipPermissions: true,
+      maxTurns,
+      maxBudgetUsd,
+      cwd,
+      ...(model ? { model } : {}),
+    },
+  });
+
+  return processQueryStream(queryStream, eventStream, streamContext);
 }

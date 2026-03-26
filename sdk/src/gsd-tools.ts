@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import type { PhaseOpInfo } from './types.js';
 
 // ─── Error type ──────────────────────────────────────────────────────────────
 
@@ -177,5 +178,29 @@ export class GSDTools {
 
   async initExecutePhase(phase: string): Promise<unknown> {
     return this.exec('state', ['begin-phase', '--phase', phase]);
+  }
+
+  /**
+   * Query phase state from gsd-tools.cjs `init phase-op`.
+   * Returns a typed PhaseOpInfo describing what exists on disk for this phase.
+   */
+  async initPhaseOp(phaseNumber: string): Promise<PhaseOpInfo> {
+    const result = await this.exec('init', ['phase-op', phaseNumber]);
+    return result as PhaseOpInfo;
+  }
+
+  /**
+   * Get a config value from gsd-tools.cjs.
+   */
+  async configGet(key: string): Promise<string | null> {
+    const result = await this.exec('config', ['get', key]);
+    return result as string | null;
+  }
+
+  /**
+   * Begin phase state tracking in gsd-tools.cjs.
+   */
+  async stateBeginPhase(phaseNumber: string): Promise<unknown> {
+    return this.exec('state', ['begin-phase', '--phase', phaseNumber]);
   }
 }

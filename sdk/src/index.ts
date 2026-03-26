@@ -143,7 +143,7 @@ export { parsePlan, parsePlanFile } from './plan-parser.js';
 export { loadConfig } from './config.js';
 export type { GSDConfig } from './config.js';
 export { GSDTools, GSDToolsError } from './gsd-tools.js';
-export { runPlanSession } from './session-runner.js';
+export { runPlanSession, runPhaseStepSession } from './session-runner.js';
 export { buildExecutorPrompt, parseAgentTools } from './prompt-builder.js';
 export * from './types.js';
 
