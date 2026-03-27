@@ -249,6 +249,11 @@ export enum GSDEventType {
   WaveComplete = 'wave_complete',
   MilestoneStart = 'milestone_start',
   MilestoneComplete = 'milestone_complete',
+  InitStart = 'init_start',
+  InitStepStart = 'init_step_start',
+  InitStepComplete = 'init_step_complete',
+  InitComplete = 'init_complete',
+  InitResearchSpawn = 'init_research_spawn',
 }
 
 /**
@@ -573,6 +578,109 @@ export interface GSDMilestoneCompleteEvent extends GSDEventBase {
   phasesCompleted: number;
 }
 
+// ─── Init workflow types ─────────────────────────────────────────────────────
+
+/**
+ * Named steps in the init workflow.
+ */
+export type InitStepName =
+  | 'setup'
+  | 'config'
+  | 'project'
+  | 'research-stack'
+  | 'research-features'
+  | 'research-architecture'
+  | 'research-pitfalls'
+  | 'synthesis'
+  | 'requirements'
+  | 'roadmap';
+
+/**
+ * Configuration overrides for InitRunner.
+ */
+export interface InitConfig {
+  /** Model for research sessions (overrides gsd-tools detected model). */
+  researchModel?: string;
+  /** Model for synthesis/roadmap sessions. */
+  orchestratorModel?: string;
+  /** Max budget per individual session in USD. Default: 3.0. */
+  maxBudgetPerSession?: number;
+  /** Max turns per session. Default: 30. */
+  maxTurnsPerSession?: number;
+}
+
+/**
+ * Result of a single init workflow step.
+ */
+export interface InitStepResult {
+  step: InitStepName;
+  success: boolean;
+  durationMs: number;
+  costUsd: number;
+  error?: string;
+  artifacts?: string[];
+}
+
+/**
+ * Result of the full init workflow run.
+ */
+export interface InitResult {
+  success: boolean;
+  steps: InitStepResult[];
+  totalCostUsd: number;
+  totalDurationMs: number;
+  artifacts: string[];
+}
+
+/**
+ * Init workflow started.
+ */
+export interface GSDInitStartEvent extends GSDEventBase {
+  type: GSDEventType.InitStart;
+  input: string;
+  projectDir: string;
+}
+
+/**
+ * Init workflow step started.
+ */
+export interface GSDInitStepStartEvent extends GSDEventBase {
+  type: GSDEventType.InitStepStart;
+  step: InitStepName;
+}
+
+/**
+ * Init workflow step completed.
+ */
+export interface GSDInitStepCompleteEvent extends GSDEventBase {
+  type: GSDEventType.InitStepComplete;
+  step: InitStepName;
+  success: boolean;
+  durationMs: number;
+  costUsd: number;
+  error?: string;
+}
+
+/**
+ * Init workflow completed.
+ */
+export interface GSDInitCompleteEvent extends GSDEventBase {
+  type: GSDEventType.InitComplete;
+  success: boolean;
+  totalCostUsd: number;
+  totalDurationMs: number;
+  artifactCount: number;
+}
+
+/**
+ * Research sessions spawned in parallel during init.
+ */
+export interface GSDInitResearchSpawnEvent extends GSDEventBase {
+  type: GSDEventType.InitResearchSpawn;
+  sessionCount: number;
+  researchTypes: string[];
+}
+
 /**
  * Discriminated union of all GSD events.
  */
@@ -600,7 +708,12 @@ export type GSDEvent =
   | GSDWaveStartEvent
   | GSDWaveCompleteEvent
   | GSDMilestoneStartEvent
-  | GSDMilestoneCompleteEvent;
+  | GSDMilestoneCompleteEvent
+  | GSDInitStartEvent
+  | GSDInitStepStartEvent
+  | GSDInitStepCompleteEvent
+  | GSDInitCompleteEvent
+  | GSDInitResearchSpawnEvent;
 
 /**
  * Transport handler interface for consuming GSD events.

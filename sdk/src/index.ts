@@ -297,3 +297,8 @@ export type { PhaseRunnerDeps, VerificationOutcome } from './phase-runner.js';
 export { CLITransport } from './cli-transport.js';
 export { WSTransport } from './ws-transport.js';
 export type { WSTransportOptions } from './ws-transport.js';
+
+// Init workflow
+export { InitRunner } from './init-runner.js';
+export type { InitRunnerDeps } from './init-runner.js';
+export type { InitConfig, InitResult, InitStepResult, InitStepName } from './types.js';
