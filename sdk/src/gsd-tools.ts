@@ -150,34 +150,85 @@ export class GSDTools {
     return JSON.parse(jsonStr);
   }
 
+  // ─── Raw exec (no JSON parsing) ───────────────────────────────────────
+
+  /**
+   * Execute a gsd-tools command and return raw stdout without JSON parsing.
+   * Use for commands like `config-set` that return plain text, not JSON.
+   */
+  async execRaw(command: string, args: string[] = []): Promise<string> {
+    const fullArgs = [this.gsdToolsPath, command, ...args, '--raw'];
+
+    return new Promise<string>((resolve, reject) => {
+      const child = execFile(
+        'node',
+        fullArgs,
+        {
+          cwd: this.projectDir,
+          maxBuffer: 10 * 1024 * 1024,
+          timeout: this.timeoutMs,
+          env: { ...process.env },
+        },
+        (error, stdout, stderr) => {
+          const stderrStr = stderr?.toString() ?? '';
+          if (error) {
+            reject(
+              new GSDToolsError(
+                `gsd-tools exited with code ${error.code ?? 'unknown'}: ${command} ${args.join(' ')}${stderrStr ? `\n${stderrStr}` : ''}`,
+                command,
+                args,
+                typeof error.code === 'number' ? error.code : (error as { status?: number }).status ?? 1,
+                stderrStr,
+              ),
+            );
+            return;
+          }
+          resolve((stdout?.toString() ?? '').trim());
+        },
+      );
+
+      child.on('error', (err) => {
+        reject(
+          new GSDToolsError(
+            `Failed to execute gsd-tools: ${err.message}`,
+            command,
+            args,
+            null,
+            '',
+          ),
+        );
+      });
+    });
+  }
+
   // ─── Typed convenience methods ─────────────────────────────────────────
 
-  async stateLoad(): Promise<unknown> {
-    return this.exec('state', ['load']);
+  async stateLoad(): Promise<string> {
+    return this.execRaw('state', ['load']);
   }
 
   async roadmapAnalyze(): Promise<RoadmapAnalysis> {
     return this.exec('roadmap', ['analyze']) as Promise<RoadmapAnalysis>;
   }
 
-  async phaseComplete(phase: string): Promise<unknown> {
-    return this.exec('phase', ['complete', phase]);
+  async phaseComplete(phase: string): Promise<string> {
+    return this.execRaw('phase', ['complete', phase]);
   }
 
-  async commit(message: string, files?: string[]): Promise<unknown> {
+  async commit(message: string, files?: string[]): Promise<string> {
     const args = [message];
     if (files?.length) {
       args.push('--files', ...files);
     }
-    return this.exec('commit', args);
+    return this.execRaw('commit', args);
   }
 
-  async verifySummary(path: string): Promise<unknown> {
-    return this.exec('verify-summary', [path]);
+  async verifySummary(path: string): Promise<string> {
+    return this.execRaw('verify-summary', [path]);
   }
 
-  async initExecutePhase(phase: string): Promise<unknown> {
-    return this.exec('state', ['begin-phase', '--phase', phase]);
+  async initExecutePhase(phase: string): Promise<string> {
+    return this.execRaw('state', ['begin-phase', '--phase', phase]);
   }
 
   /**
@@ -200,8 +251,8 @@ export class GSDTools {
   /**
    * Begin phase state tracking in gsd-tools.cjs.
    */
-  async stateBeginPhase(phaseNumber: string): Promise<unknown> {
-    return this.exec('state', ['begin-phase', '--phase', phaseNumber]);
+  async stateBeginPhase(phaseNumber: string): Promise<string> {
+    return this.execRaw('state', ['begin-phase', '--phase', phaseNumber]);
   }
 
   /**
@@ -225,8 +276,9 @@ export class GSDTools {
   /**
    * Set a config value via gsd-tools.cjs `config-set`.
    * Handles type coercion (booleans, numbers, JSON) on the gsd-tools side.
+   * Note: config-set returns `key=value` text, not JSON, so we use execRaw.
    */
-  async configSet(key: string, value: string): Promise<unknown> {
-    return this.exec('config-set', [key, value]);
+  async configSet(key: string, value: string): Promise<string> {
+    return this.execRaw('config-set', [key, value]);
   }
 }

@@ -166,7 +166,7 @@ describe('GSDTools', () => {
         const args = process.argv.slice(2);
         // Script receives: state load --raw
         if (args[0] === 'state' && args[1] === 'load' && args.includes('--raw')) {
-          process.stdout.write(JSON.stringify({ phase: "3", status: "executing" }));
+          process.stdout.write('phase=3\\nstatus=executing');
         } else {
           process.stderr.write('unexpected args: ' + args.join(' '));
           process.exit(1);
@@ -177,7 +177,7 @@ describe('GSDTools', () => {
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
       const result = await tools.stateLoad();
 
-      expect(result).toEqual({ phase: '3', status: 'executing' });
+      expect(result).toBe('phase=3\nstatus=executing');
     });
 
     it('commit() passes message and optional files', async () => {
@@ -185,20 +185,15 @@ describe('GSDTools', () => {
         'commit.cjs',
         `
         const args = process.argv.slice(2);
-        // commit <msg> --files f1 f2 --raw
-        process.stdout.write(JSON.stringify({ args }));
+        // commit <msg> --files f1 f2 --raw — returns a git SHA
+        process.stdout.write('f89ae07');
         `,
       );
 
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
-      const result = await tools.commit('test message', ['file1.md', 'file2.md']) as { args: string[] };
+      const result = await tools.commit('test message', ['file1.md', 'file2.md']);
 
-      expect(result.args).toContain('commit');
-      expect(result.args).toContain('test message');
-      expect(result.args).toContain('--files');
-      expect(result.args).toContain('file1.md');
-      expect(result.args).toContain('file2.md');
-      expect(result.args).toContain('--raw');
+      expect(result).toBe('f89ae07');
     });
 
     it('roadmapAnalyze() calls roadmap analyze', async () => {
@@ -226,7 +221,7 @@ describe('GSDTools', () => {
         `
         const args = process.argv.slice(2);
         if (args[0] === 'verify-summary' && args[1] === '/path/to/SUMMARY.md') {
-          process.stdout.write(JSON.stringify({ valid: true }));
+          process.stdout.write('passed');
         } else {
           process.exit(1);
         }
@@ -236,7 +231,7 @@ describe('GSDTools', () => {
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
       const result = await tools.verifySummary('/path/to/SUMMARY.md');
 
-      expect(result).toEqual({ valid: true });
+      expect(result).toBe('passed');
     });
   });
 
@@ -332,7 +327,7 @@ describe('GSDTools', () => {
         `
         const args = process.argv.slice(2);
         if (args[0] === 'config-set' && args[1] === 'workflow.auto_advance' && args[2] === 'true' && args.includes('--raw')) {
-          process.stdout.write(JSON.stringify({ success: true }));
+          process.stdout.write('workflow.auto_advance=true');
         } else {
           process.stderr.write('unexpected args: ' + args.join(' '));
           process.exit(1);
@@ -343,7 +338,7 @@ describe('GSDTools', () => {
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
       const result = await tools.configSet('workflow.auto_advance', 'true');
 
-      expect(result).toEqual({ success: true });
+      expect(result).toBe('workflow.auto_advance=true');
     });
 
     it('passes string values without coercion', async () => {
@@ -352,15 +347,14 @@ describe('GSDTools', () => {
         `
         const args = process.argv.slice(2);
         // config-set mode yolo --raw
-        process.stdout.write(JSON.stringify({ key: args[1], value: args[2] }));
+        process.stdout.write(args[1] + '=' + args[2]);
         `,
       );
 
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
-      const result = await tools.configSet('mode', 'yolo') as { key: string; value: string };
+      const result = await tools.configSet('mode', 'yolo');
 
-      expect(result.key).toBe('mode');
-      expect(result.value).toBe('yolo');
+      expect(result).toBe('mode=yolo');
     });
   });
 });

@@ -403,7 +403,7 @@ describe('GSDTools typed methods', () => {
         `
         const args = process.argv.slice(2);
         if (args[0] === 'state' && args[1] === 'begin-phase' && args[2] === '--phase' && args[3] === '3') {
-          process.stdout.write(JSON.stringify({ status: 'ok', phase: '3' }));
+          process.stdout.write('ok');
         } else {
           process.stderr.write('unexpected args: ' + args.join(' '));
           process.exit(1);
@@ -412,9 +412,9 @@ describe('GSDTools typed methods', () => {
       );
 
       const tools = new GSDTools({ projectDir: tmpDir, gsdToolsPath: scriptPath });
-      const result = await tools.stateBeginPhase('3') as { status: string };
+      const result = await tools.stateBeginPhase('3');
 
-      expect(result.status).toBe('ok');
+      expect(result).toBe('ok');
     });
   });
 });

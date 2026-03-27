@@ -1,4 +1,4 @@
-// #!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * CLI entry point for gsd-sdk.
  *
