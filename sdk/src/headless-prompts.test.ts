@@ -51,6 +51,27 @@ const EXPECTED_AGENTS = [
   'gsd-planner.md',
   'gsd-verifier.md',
   'gsd-plan-checker.md',
+  'gsd-project-researcher.md',
+  'gsd-research-synthesizer.md',
+  'gsd-roadmapper.md',
+];
+
+const templatesDir = join(promptsDir, 'templates');
+const researchTemplatesDir = join(templatesDir, 'research-project');
+
+const EXPECTED_TEMPLATES = [
+  'project.md',
+  'requirements.md',
+  'roadmap.md',
+  'state.md',
+];
+
+const EXPECTED_RESEARCH_TEMPLATES = [
+  'ARCHITECTURE.md',
+  'FEATURES.md',
+  'PITFALLS.md',
+  'STACK.md',
+  'SUMMARY.md',
 ];
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -88,6 +109,46 @@ describe('headless prompt contract', () => {
         for (const [label, pattern] of BLOCKED_PATTERNS) {
           it(`contains no ${label}`, async () => {
             const content = await readFile(join(agentsDir, filename), 'utf-8');
+            const matches = content.match(new RegExp(pattern.source, pattern.flags + 'g'));
+            expect(matches, `Found ${label} in ${filename}: ${matches?.join(', ')}`).toBeNull();
+          });
+        }
+      });
+    }
+  });
+
+  describe('template file inventory', () => {
+    it('has all expected top-level template files', () => {
+      const actual = readdirSync(templatesDir).filter(f => f.endsWith('.md')).sort();
+      expect(actual).toEqual(EXPECTED_TEMPLATES.sort());
+    });
+
+    it('has all expected research-project template files', () => {
+      const actual = readdirSync(researchTemplatesDir).sort();
+      expect(actual).toEqual(EXPECTED_RESEARCH_TEMPLATES.sort());
+    });
+  });
+
+  describe('zero interactive patterns in template prompts', () => {
+    for (const filename of EXPECTED_TEMPLATES) {
+      describe(filename, () => {
+        for (const [label, pattern] of BLOCKED_PATTERNS) {
+          it(`contains no ${label}`, async () => {
+            const content = await readFile(join(templatesDir, filename), 'utf-8');
+            const matches = content.match(new RegExp(pattern.source, pattern.flags + 'g'));
+            expect(matches, `Found ${label} in ${filename}: ${matches?.join(', ')}`).toBeNull();
+          });
+        }
+      });
+    }
+  });
+
+  describe('zero interactive patterns in research-project templates', () => {
+    for (const filename of EXPECTED_RESEARCH_TEMPLATES) {
+      describe(filename, () => {
+        for (const [label, pattern] of BLOCKED_PATTERNS) {
+          it(`contains no ${label}`, async () => {
+            const content = await readFile(join(researchTemplatesDir, filename), 'utf-8');
             const matches = content.match(new RegExp(pattern.source, pattern.flags + 'g'));
             expect(matches, `Found ${label} in ${filename}: ${matches?.join(', ')}`).toBeNull();
           });
