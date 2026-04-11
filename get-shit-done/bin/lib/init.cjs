@@ -241,6 +241,9 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
     state_path: toPosixPath(path.relative(cwd, path.join(planningDir(cwd), 'STATE.md'))),
     roadmap_path: toPosixPath(path.relative(cwd, path.join(planningDir(cwd), 'ROADMAP.md'))),
     requirements_path: toPosixPath(path.relative(cwd, path.join(planningDir(cwd), 'REQUIREMENTS.md'))),
+
+    // Pattern mapper output (null until PATTERNS.md exists in phase dir)
+    patterns_path: null,
   };
 
   if (phaseInfo?.directory) {
@@ -267,6 +270,10 @@ function cmdInitPlanPhase(cwd, phase, raw, options = {}) {
       const reviewsFile = files.find(f => f.endsWith('-REVIEWS.md') || f === 'REVIEWS.md');
       if (reviewsFile) {
         result.reviews_path = toPosixPath(path.join(phaseInfo.directory, reviewsFile));
+      }
+      const patternsFile = files.find(f => f.endsWith('-PATTERNS.md') || f === 'PATTERNS.md');
+      if (patternsFile) {
+        result.patterns_path = toPosixPath(path.join(phaseInfo.directory, patternsFile));
       }
     } catch { /* intentionally empty */ }
   }
